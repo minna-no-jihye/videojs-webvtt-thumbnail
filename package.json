@@ -1,0 +1,59 @@
+{
+  "name": "videojs-webvtt-thumbnails",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/videojs-webvtt-thumbnails.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/videojs-webvtt-thumbnails.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
+  },
+  "keywords": [
+    "videojs",
+    "video.js",
+    "plugin",
+    "webvtt",
+    "thumbnails",
+    "preview"
+  ],
+  "author": "",
+  "license": "MIT",
+  "description": "A Video.js plugin for displaying WebVTT thumbnails",
+  "devDependencies": {
+    "@types/node": "^24.2.0",
+    "@types/video.js": "^7.3.58",
+    "@vitejs/plugin-legacy": "^7.1.0",
+    "@vitest/ui": "^2.1.8",
+    "jsdom": "^25.0.1",
+    "terser": "^5.43.1",
+    "typescript": "^5.9.2",
+    "video.js": "^8.23.3",
+    "vite": "^7.0.6",
+    "vitest": "^2.1.8"
+  },
+  "peerDependencies": {
+    "video.js": "^8.0.0"
+  },
+  "browserslist": [
+    "Chrome >= 42",
+    "Firefox >= 38",
+    "Safari >= 8",
+    "Edge >= 12",
+    "Opera >= 29",
+    "not IE 11"
+  ]
+}

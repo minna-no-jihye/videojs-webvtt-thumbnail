@@ -1,0 +1,4 @@
+dist
+node_modules
+src/locales/en
+src/locales/ko
