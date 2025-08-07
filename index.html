@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video.js WebVTT Thumbnails Demo</title>
+  <link href="https://vjs.zencdn.net/8.21.0/video-js.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    .video-container {
+      margin-bottom: 30px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Video.js WebVTT Thumbnails Plugin Demo</h1>
+  
+  <div class="video-container">
+    <video
+      id="my-video"
+      class="video-js vjs-default-skin vjs-big-play-centered"
+      controls
+      preload="auto"
+      width="800"
+      height="450"
+      data-setup='{}'>
+      <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4">
+      <p class="vjs-no-js">
+        To view this video please enable JavaScript, and consider upgrading to a web browser that
+        supports HTML5 video.
+      </p>
+    </video>
+  </div>
+
+  <h2>Test Instructions</h2>
+  <ul>
+    <li>Video should load and play normally</li>
+    <li>Plugin should initialize without errors</li>
+    <li>Check console for plugin initialization messages</li>
+  </ul>
+
+  <script src="https://vjs.zencdn.net/8.21.0/video.min.js"></script>
+  <script type="module">
+    import WebvttThumbnails from './src/index.ts';
+    
+    const player = videojs('my-video');
+    
+    player.ready(() => {
+      console.log('Player is ready');
+      
+      // Initialize the plugin
+      player.webvttThumbnails({
+        src: 'path/to/thumbnails.vtt',
+        showOnHover: true
+      });
+    });
+  </script>
+</body>
+</html>
