@@ -1,48 +1,56 @@
 import { VTTCue } from '@/types';
+import videojs from 'video.js';
 
 export class VTTParser {
   parse(content: string): VTTCue[] {
     const lines = content.trim().split('\n');
 
-    this.validateWebVTT(lines);
+    if (!this.isValidWebVTT(lines)) {
+      videojs.log.warn('[VTTParser] Invalid WebVTT file: must start with WEBVTT');
+      return [];
+    }
 
     return this.extractCues(lines);
   }
 
-  private validateWebVTT(lines: string[]): void {
-    if (!lines[0]?.includes('WEBVTT')) {
-      throw new Error('Invalid WebVTT file: must start with WEBVTT');
-    }
+  private isValidWebVTT(lines: string[]): boolean {
+    return lines[0]?.includes('WEBVTT') ?? false;
   }
 
   private extractCues(lines: string[]): VTTCue[] {
-    return lines
-      .slice(1)
-      .map((line, index) => ({ line: line.trim(), originalIndex: index + 1 }))
-      .filter(({ line }) => this.isTimestampLine(line))
-      .map(({ line, originalIndex }) => this.parseCueFromLines(line, lines, originalIndex))
-      .filter((cue): cue is VTTCue => cue !== null);
+    const cues: VTTCue[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      if (this.isTimestampLine(line)) {
+        const cue = this.parseCue(line, lines, i);
+        if (cue) cues.push(cue);
+      }
+    }
+
+    return cues;
   }
 
   private isTimestampLine(line: string): boolean {
     return line.includes('-->');
   }
 
-  private parseCueFromLines(
+  private parseCue(
     timestampLine: string,
     lines: string[],
-    currentIndex: number,
+    lineIndex: number,
   ): VTTCue | null {
     const timestamps = this.parseTimestamps(timestampLine);
     if (!timestamps) return null;
 
-    const textLines = this.collectCueText(lines, currentIndex + 1);
-    if (!textLines.length) return null;
+    const text = this.collectCueText(lines, lineIndex + 1);
+    if (!text) return null;
 
     return {
       startTime: timestamps.start,
       endTime: timestamps.end,
-      text: textLines.join('\n'),
+      text,
     };
   }
 
@@ -60,7 +68,7 @@ export class VTTParser {
     }
   }
 
-  private collectCueText(lines: string[], startIndex: number): string[] {
+  private collectCueText(lines: string[], startIndex: number): string {
     const textLines: string[] = [];
 
     for (let i = startIndex; i < lines.length; i++) {
@@ -71,7 +79,7 @@ export class VTTParser {
       textLines.push(line);
     }
 
-    return textLines;
+    return textLines.join('\n');
   }
 
   private parseTime(timeStr: string): number {

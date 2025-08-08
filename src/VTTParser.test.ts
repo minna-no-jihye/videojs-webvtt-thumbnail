@@ -114,17 +114,19 @@ frame.jpg`;
       expect(result.some(cue => cue.text === '')).toBe(false);
     });
 
-    it('should throw error for invalid WebVTT header', () => {
+    it('should return empty array for invalid WebVTT header', () => {
       const content = `INVALID
 
 00:00.000 --> 00:10.000
 1.jpg`;
 
-      expect(() => parser.parse(content)).toThrow('Invalid WebVTT file');
+      const result = parser.parse(content);
+      expect(result).toEqual([]);
     });
 
-    it('should throw error for empty content', () => {
-      expect(() => parser.parse('')).toThrow('Invalid WebVTT file');
+    it('should return empty array for empty content', () => {
+      const result = parser.parse('');
+      expect(result).toEqual([]);
     });
 
     it('should handle content with extra whitespace', () => {
