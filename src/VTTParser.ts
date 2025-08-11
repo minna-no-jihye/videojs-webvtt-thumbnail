@@ -1,77 +1,87 @@
 import { VTTCue } from '@/types';
+import videojs from 'video.js';
 
 export class VTTParser {
   parse(content: string): VTTCue[] {
     const lines = content.trim().split('\n');
 
-    this.validateWebVTT(lines);
+    if (!this.isValidWebVTT(lines)) {
+      videojs.log.warn('Invalid WebVTT format: file should start with WEBVTT');
+      return [];
+    }
 
     return this.extractCues(lines);
   }
 
-  private validateWebVTT(lines: string[]): void {
-    if (!lines[0]?.includes('WEBVTT')) {
-      throw new Error('Invalid WebVTT file: must start with WEBVTT');
-    }
+  private isValidWebVTT(lines: string[]): boolean {
+    return lines[0]?.includes('WEBVTT');
   }
 
   private extractCues(lines: string[]): VTTCue[] {
-    return lines
-      .slice(1)
-      .map((line, index) => ({ line: line.trim(), originalIndex: index + 1 }))
-      .filter(({ line }) => this.isTimestampLine(line))
-      .map(({ line, originalIndex }) => this.parseCueFromLines(line, lines, originalIndex))
-      .filter((cue): cue is VTTCue => cue !== null);
+    const cues: VTTCue[] = [];
+    const trimmedLines = lines.map(line => line.trim());
+    
+    for (let i = 1; i < trimmedLines.length; i++) {
+      const line = trimmedLines[i];
+      
+      if (!line || !this.isTimestampLine(line)) continue;
+      
+      const timestamps = this.parseTimestamps(line);
+      if (!timestamps) continue;
+      
+      const { textLines, nextIndex } = this.collectCueText(trimmedLines, i + 1);
+      
+      if (textLines.length > 0) {
+        cues.push({
+          startTime: timestamps.start,
+          endTime: timestamps.end,
+          text: textLines.join('\n'),
+        });
+      }
+      
+      i = nextIndex - 1;
+    }
+    
+    return cues;
+  }
+
+  private collectCueText(lines: string[], startIndex: number): { textLines: string[]; nextIndex: number } {
+    const textLines: string[] = [];
+    let endIndex = startIndex;
+    
+    for (let i = startIndex; i < lines.length; i++) {
+      const line = lines[i];
+      
+      if (!line || this.isTimestampLine(line)) {
+        endIndex = i;
+        break;
+      }
+      
+      textLines.push(line);
+      endIndex = i + 1;
+    }
+    
+    return { textLines, nextIndex: endIndex };
   }
 
   private isTimestampLine(line: string): boolean {
     return line.includes('-->');
   }
 
-  private parseCueFromLines(
-    timestampLine: string,
-    lines: string[],
-    currentIndex: number,
-  ): VTTCue | null {
-    const timestamps = this.parseTimestamps(timestampLine);
-    if (!timestamps) return null;
-
-    const textLines = this.collectCueText(lines, currentIndex + 1);
-    if (!textLines.length) return null;
-
-    return {
-      startTime: timestamps.start,
-      endTime: timestamps.end,
-      text: textLines.join('\n'),
-    };
-  }
-
   private parseTimestamps(line: string): { start: number; end: number } | null {
-    const parts = line.split('-->').map(s => s.trim());
+    const parts = line.split('-->');
     if (parts.length !== 2) return null;
-
+    
+    const [startStr, endStr] = parts.map(s => s.trim());
+    
     try {
       return {
-        start: this.parseTime(parts[0]),
-        end: this.parseTime(parts[1]),
+        start: this.parseTime(startStr),
+        end: this.parseTime(endStr),
       };
     } catch {
       return null;
     }
-  }
-
-  private collectCueText(lines: string[], startIndex: number): string[] {
-    const textLines: string[] = [];
-
-    for (let i = startIndex; i < lines.length; i++) {
-      const line = lines[i].trim();
-
-      if (!line || this.isTimestampLine(line)) break;
-
-      textLines.push(line);
-    }
-
-    return textLines;
   }
 
   private parseTime(timeStr: string): number {
