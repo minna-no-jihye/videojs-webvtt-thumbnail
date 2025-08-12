@@ -1,4 +1,4 @@
-import viteLegacyPlugin from "@vitejs/plugin-legacy/dist";
+import viteLegacyPlugin from "@vitejs/plugin-legacy";
 import {resolve} from 'path';
 import {defineConfig} from 'vite';
 

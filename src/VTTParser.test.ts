@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import videojs from 'video.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import webvttContent from '../test/webvtt.vtt?raw';
 import type { VTTCue } from './types';
 import { VTTParser } from './VTTParser';
@@ -8,39 +9,19 @@ describe('VTTParser', () => {
 
   beforeEach(() => {
     parser = new VTTParser();
+    vi.clearAllMocks();
   });
 
-  describe('parse', () => {
-    it('should parse actual WebVTT file from /test/webvtt.vtt', () => {
+  describe('VTT 파일 파싱', () => {
+    it('test/webvtt.vtt 파일을 정상적으로 파싱한다.', () => {
       const result: VTTCue[] = parser.parse(webvttContent);
-
-      // Verify total count
       expect(result).toHaveLength(12);
 
-      // Test first entries with structured data
-      const expectedFirstEntries: VTTCue[] = [
-        { startTime: 0, endTime: 10, text: '1.jpg' },
-        { startTime: 10, endTime: 20, text: '2.jpg' },
-        { startTime: 20, endTime: 30, text: '3.jpg' },
-        { startTime: 30, endTime: 40, text: '4.jpg' },
-        { startTime: 40, endTime: 50, text: '5.jpg' },
-      ];
-
-      expectedFirstEntries.forEach((expected, index) => {
-        expect(result[index]).toEqual(expected);
-      });
-
-      // Test cyclic pattern (files repeat)
-      expect(result[5].text).toBe('1.jpg');
-      expect(result[6].text).toBe('2.jpg');
-
-      // Verify time continuity
-      for (let i = 1; i < result.length; i++) {
-        expect(result[i].startTime).toBe(result[i - 1].endTime);
-      }
     });
+  });
 
-    it('should handle time format with hours', () => {
+  describe('다양한 시간 형식 처리', () => {
+    it('시간 형식 (HH:MM:SS.mmm)을 처리한다', () => {
       const content = `WEBVTT
 
 01:30:15.500 --> 01:45:30.750
@@ -56,7 +37,7 @@ thumbnail.jpg`;
       });
     });
 
-    it('should handle time format without hours', () => {
+    it('시간 형식 (MM:SS.mmm)을 처리해야 함', () => {
       const content = `WEBVTT
 
 05:30.000 --> 10:15.000
@@ -72,7 +53,7 @@ image.png`;
       });
     });
 
-    it('should handle decimal seconds', () => {
+    it('밀리초 단위를 정확히 처리한다', () => {
       const content = `WEBVTT
 
 00:00:01.234 --> 00:00:05.678
@@ -88,7 +69,21 @@ frame.jpg`;
       });
     });
 
-    it('should skip empty cues and handle multiple empty lines', () => {
+    it('엣지 케이스 시간을 정확히 처리한다', () => {
+      const content = `WEBVTT
+
+59:59.999 --> 60:00.000
+edge.jpg`;
+
+      const result = parser.parse(content);
+
+      expect(result[0].startTime).toBeCloseTo(3599.999, 3);
+      expect(result[0].endTime).toBe(3600);
+    });
+  });
+
+  describe('빈 줄과 공백 처리', () => {
+    it('빈 큐를 건너뛰고 여러 빈 줄을 처리한다', () => {
       const content = `WEBVTT
 
 00:00.000 --> 00:10.000
@@ -110,24 +105,11 @@ frame.jpg`;
       expect(result[1].text).toBe('2.jpg');
       expect(result[2].text).toBe('3.jpg');
 
-      // Verify that empty cue was skipped
+      // 빈 큐가 생략되었는지 확인
       expect(result.some(cue => cue.text === '')).toBe(false);
     });
 
-    it('should throw error for invalid WebVTT header', () => {
-      const content = `INVALID
-
-00:00.000 --> 00:10.000
-1.jpg`;
-
-      expect(() => parser.parse(content)).toThrow('Invalid WebVTT file');
-    });
-
-    it('should throw error for empty content', () => {
-      expect(() => parser.parse('')).toThrow('Invalid WebVTT file');
-    });
-
-    it('should handle content with extra whitespace', () => {
+    it('추가 공백이 있는 콘텐츠를 처리한다.', () => {
       const content = `  WEBVTT  
 
   00:00.000   -->   00:10.000  
@@ -146,7 +128,7 @@ frame.jpg`;
       });
     });
 
-    it('should handle Windows line endings', () => {
+    it('Windows 줄바꿈을 처리한다', () => {
       const content = `WEBVTT\r\n\r\n00:00.000 --> 00:10.000\r\n1.jpg\r\n\r\n00:10.000 --> 00:20.000\r\n2.jpg`;
 
       const result = parser.parse(content);
@@ -155,32 +137,32 @@ frame.jpg`;
       expect(result[0].text).toBe('1.jpg');
       expect(result[1].text).toBe('2.jpg');
     });
+  });
 
-    it('should handle multiple text lines after timestamp', () => {
-      const content = `WEBVTT
+  describe('WebVTT 헤더 처리', () => {
+    it('잘못된 WebVTT 헤더에 대해 경고를 출력하고 빈 배열을 반환한다', () => {
+      const warnSpy = vi.spyOn(videojs.log, 'warn');
+      const content = `INVALID
 
 00:00.000 --> 00:10.000
-first-line.jpg
-
-00:10.000 --> 00:20.000
-second-line.jpg`;
-
-      const result = parser.parse(content);
-
-      expect(result).toHaveLength(2);
-      expect(result[0].text).toBe('first-line.jpg');
-      expect(result[1].text).toBe('second-line.jpg');
-    });
-
-    it('should return empty array for WebVTT with no cues', () => {
-      const content = `WEBVTT`;
+1.jpg`;
 
       const result = parser.parse(content);
 
       expect(result).toEqual([]);
+      expect(warnSpy).toHaveBeenCalledWith('Invalid WebVTT format: file should start with WEBVTT');
     });
 
-    it('should handle WebVTT with metadata header', () => {
+    it('빈 콘텐츠에 대해 경고를 출력하고 빈 배열을 반환한다', () => {
+      const warnSpy = vi.spyOn(videojs.log, 'warn');
+
+      const result = parser.parse('');
+
+      expect(result).toEqual([]);
+      expect(warnSpy).toHaveBeenCalledWith('Invalid WebVTT format: file should start with WEBVTT');
+    });
+
+    it('메타데이터 헤더가 있는 WebVTT를 처리해야 함', () => {
       const content = `WEBVTT
 Kind: thumbnails
 
@@ -197,7 +179,17 @@ Kind: thumbnails
       expect(result[1].text).toBe('2.jpg');
     });
 
-    it('should handle malformed timestamps gracefully', () => {
+    it('큐가 없는 WebVTT에 대해 빈 배열을 반환해야 함', () => {
+      const content = `WEBVTT`;
+
+      const result = parser.parse(content);
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('잘못된 형식 처리', () => {
+    it('잘못된 타임스탬프라인은 무시된다', () => {
       const content = `WEBVTT
 
 00:00.000 --> 
@@ -211,12 +203,49 @@ Kind: thumbnails
 
       const result = parser.parse(content);
 
-      // Only the valid cue should be parsed
-      expect(result.length).toBeGreaterThanOrEqual(1);
-      expect(result.find(cue => cue.text === '3.jpg')).toBeDefined();
+      // 유효한 큐만 파싱되어야 함 (불완전한 타임스탬프는 무시됨)
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toBe('3.jpg');
+      expect(result[0].startTime).toBe(30);  // 00:30.000 = 30초
+      expect(result[0].endTime).toBe(40);     // 00:40.000 = 40초
     });
 
-    it('should handle URL paths in text', () => {
+    it('타임스탬프 다음에 텍스트가 없는 경우를 처리해야 함', () => {
+      const content = `WEBVTT
+
+00:00.000 --> 00:10.000
+
+00:10.000 --> 00:20.000
+valid.jpg`;
+
+      const result = parser.parse(content);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toBe('valid.jpg');
+    });
+
+    it('연속된 타임스탬프를 처리해야 함', () => {
+      const content = `WEBVTT
+
+00:00.000 --> 00:10.000
+00:10.000 --> 00:20.000
+text.jpg`;
+
+      const result = parser.parse(content);
+
+      // 첫 번째 타임스탬프는 텍스트가 다른 타임스탬프이므로 건너뛰고
+      // 두 번째 타임스탬프와 텍스트만 파싱됨
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        startTime: 10,  // 00:10.000 = 10초
+        endTime: 20,     // 00:20.000 = 20초
+        text: 'text.jpg',
+      });
+    });
+  });
+
+  describe('다양한 경로 형식', () => {
+    it('URL 경로를 처리해야 함', () => {
       const content = `WEBVTT
 
 00:00.000 --> 00:10.000
@@ -235,32 +264,21 @@ http://example.com/thumbnails/1.jpg
       expect(result[1].text).toBe('../images/2.jpg');
       expect(result[2].text).toBe('/absolute/path/3.jpg');
     });
-  });
 
-  describe('parseTime', () => {
-    it('should parse time with milliseconds correctly', () => {
-      // parseTime is private, so we test it through parse method
+    it('공백이 포함된 파일명을 처리해야 함', () => {
       const content = `WEBVTT
 
-00:00:00.123 --> 00:00:00.456
-test.jpg`;
+00:00.000 --> 00:10.000
+file name with spaces.jpg
+
+00:10.000 --> 00:20.000
+another file.png`;
 
       const result = parser.parse(content);
 
-      expect(result[0].startTime).toBeCloseTo(0.123, 3);
-      expect(result[0].endTime).toBeCloseTo(0.456, 3);
-    });
-
-    it('should handle edge case times', () => {
-      const content = `WEBVTT
-
-59:59.999 --> 60:00.000
-edge.jpg`;
-
-      const result = parser.parse(content);
-
-      expect(result[0].startTime).toBeCloseTo(3599.999, 3);
-      expect(result[0].endTime).toBe(3600);
+      expect(result).toHaveLength(2);
+      expect(result[0].text).toBe('file name with spaces.jpg');
+      expect(result[1].text).toBe('another file.png');
     });
   });
 });

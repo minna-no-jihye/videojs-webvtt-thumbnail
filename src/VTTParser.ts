@@ -20,49 +20,43 @@ export class VTTParser {
   private extractCues(lines: string[]): VTTCue[] {
     const cues: VTTCue[] = [];
     const trimmedLines = lines.map(line => line.trim());
-    
-    for (let i = 1; i < trimmedLines.length; i++) {
-      const line = trimmedLines[i];
-      
-      if (!line || !this.isTimestampLine(line)) continue;
-      
-      const timestamps = this.parseTimestamps(line);
-      if (!timestamps) continue;
-      
-      const { textLines, nextIndex } = this.collectCueText(trimmedLines, i + 1);
-      
-      if (textLines.length > 0) {
-        cues.push({
-          startTime: timestamps.start,
-          endTime: timestamps.end,
-          text: textLines.join('\n'),
-        });
+
+    const SKIP_WEBVTT_HEADER = 1;
+    let currentLineIndex = SKIP_WEBVTT_HEADER;
+
+    while (currentLineIndex < trimmedLines.length) {
+      const currentLine = trimmedLines[currentLineIndex];
+
+      if (!currentLine) {
+        currentLineIndex++;
+        continue;
       }
-      
-      i = nextIndex - 1;
+      const isTimestamp = this.isTimestampLine(currentLine);
+      if (isTimestamp) {
+        const timestamps = this.parseTimestamps(currentLine);
+        const nextLineIndex = currentLineIndex + 1;
+        const nextLine = trimmedLines[nextLineIndex];
+        const nextLineIsText = nextLine && !this.isTimestampLine(nextLine);
+
+        if (timestamps && nextLineIsText) {
+          cues.push({
+            startTime: timestamps.start,
+            endTime: timestamps.end,
+            text: nextLine,
+          });
+
+          const LINES_PROCESSED = 2; // 타임스탬프 라인 + 텍스트 라인
+          currentLineIndex += LINES_PROCESSED;
+          continue;
+        }
+      }
+
+      currentLineIndex++;
     }
-    
+
     return cues;
   }
 
-  private collectCueText(lines: string[], startIndex: number): { textLines: string[]; nextIndex: number } {
-    const textLines: string[] = [];
-    let endIndex = startIndex;
-    
-    for (let i = startIndex; i < lines.length; i++) {
-      const line = lines[i];
-      
-      if (!line || this.isTimestampLine(line)) {
-        endIndex = i;
-        break;
-      }
-      
-      textLines.push(line);
-      endIndex = i + 1;
-    }
-    
-    return { textLines, nextIndex: endIndex };
-  }
 
   private isTimestampLine(line: string): boolean {
     return line.includes('-->');
@@ -71,13 +65,22 @@ export class VTTParser {
   private parseTimestamps(line: string): { start: number; end: number } | null {
     const parts = line.split('-->');
     if (parts.length !== 2) return null;
-    
+
     const [startStr, endStr] = parts.map(s => s.trim());
-    
+
+    // 빈 문자열 체크
+    if (!startStr || !endStr) return null;
+
     try {
+      const startTime = this.parseTime(startStr);
+      const endTime = this.parseTime(endStr);
+
+      // NaN 체크
+      if (isNaN(startTime) || isNaN(endTime)) return null;
+
       return {
-        start: this.parseTime(startStr),
-        end: this.parseTime(endStr),
+        start: startTime,
+        end: endTime,
       };
     } catch {
       return null;
